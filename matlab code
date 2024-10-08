@@ -1,3 +1,60 @@
-matlab code fwefewfewfewfwefe ewfew
-fewfewfwef
-fwefewfwefeasd
+clear all;
+close all;
+clc;
+Ls=3e8;
+Ldlw=300e-3             %unit=m,device length in CST
+sigma=1e-3;             %unit=m,bunch length
+
+%% wake potential
+Data= importdata('dirdlw-l300mm-bp2-bl1-fre185.txt');              %import CST wake potential data
+Sw=Data(:,1)*1e-3;                                                 %unit=m
+Sw=transpose(Sw);                                                  %unit=V/C*m wake potential 
+Wake=Data(:,2)*(1e12)/Ldlw;
+Wake=transpose(Wake);
+subplot( 3, 1, 1);
+plot(Sw*1e3,Wake);
+xlabel('S(mm)')
+ylabel('wake potential(V/C*m)')
+
+
+%% gaussian distribution
+dz=Sw(1,2)-Sw(1,1);
+Ssta=Sw(1,1)/2;                                                  %unit=m
+Send=Sw(1,length(Sw))/2;                                         %unit=m
+Sg=Ssta:dz:Send;
+
+C=1/(sigma*sqrt(2*3.14));                                        %gaussian bunch profile
+D=-1.*Sg.*Sg/(2*sigma*sigma);                                    %gaussian bunch profile
+Wg=C*exp(D)*dz;
+subplot( 3, 1, 2);
+plot(Sg*1e3, Wg)
+xlabel('S(mm)')
+ylabel('charge distrbution')
+axis([-inf, inf , -inf , inf]);
+
+%deconvolution
+
+no = length(Wake);
+ni = length(Wg);
+nfft = 2^nextpow2(no+ni-1);
+ozp = [Wake, zeros(1,nfft-no)];                                %zero padding for wake and guassian
+izp = [Wg, zeros(1,nfft-ni)];                                  %zero padding for wake and guassian
+O = fft(ozp);                                                  %FFT(wake potential)
+I = fft(izp);                                                  %FFT(gaussina)
+Y = O ./ I;                                                    %
+h = real(ifft(Y));                                             %
+h=h(1:1:length(Sg));
+h=h.*Ldesign;
+subplot( 3, 1, 3);
+plot(Sg*1e3,(-1*h))
+xlabel('S(mm)')
+ylabel('wake function(V/(C*m))')
+axis([0, 50 , -inf , inf]);
+% % export wake function
+wakepon=[(Sg*1e3)
+         (-1*h)];           
+filename=['wakefunction_185ghz.txt'];
+fid=fopen(filename,'w');
+fprintf(fid,'%13e   %13e \r\n', wakepon);
+fclose(fid);
+
